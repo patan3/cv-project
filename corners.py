@@ -58,7 +58,7 @@ objp *= square_size
 objpoints = [] # 3d point in real world space
 imgpoints = [] # 2d points in image plane.
 
-images = glob.glob('images/test/*.jpg')
+images = glob.glob('images/*.jpg')
 
 for fname in images:
     img = cv.imread(fname)
@@ -70,7 +70,6 @@ for fname in images:
     # If found, add object points, image points (after refining them)
     if ret == True:
         objpoints.append(objp)
-
         corners2 = cv.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
         imgpoints.append(corners2)
 
@@ -79,14 +78,24 @@ for fname in images:
         cv.imshow('img', img)
         cv.waitKey(500)
     else:
-        img = cv.imread('images/test/WIN_20260211_15_53_19_Pro.jpg', 1)
         points4 = get_four_corners_manually(img)
         corners = interpolate_chessboard_corners(points4, pattern_size=(6,9))
         corners2 = cv.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
         imgpoints.append(corners2)
-
-        # Draw and display the corners
+        
         cv.drawChessboardCorners(img, (9,6), corners2, ret)
         cv.imshow('img', img)
         cv.waitKey(0)
+        
 cv.destroyAllWindows()
+
+#bad ones:
+"""
+images\WIN_20260211_15_53_19_Pro.jpg
+images\WIN_20260211_15_53_23_Pro.jpg
+images\WIN_20260211_15_53_25_Pro.jpg
+images\WIN_20260211_15_53_35_Pro.jpg
+images\WIN_20260211_15_54_49_Pro.jpg
+images\WIN_20260211_15_54_53_Pro.jpg
+images\WIN_20260211_15_54_57_Pro.jpg
+"""

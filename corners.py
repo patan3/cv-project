@@ -15,7 +15,7 @@ def get_four_corners_manually(img, window="img"):
             cv.putText(img, f"{x},{y}", (x, y), font, 1, (255, 0, 0), 2)
             cv.imshow('img', img)
 
-    cv.namedWindow(window, cv.WINDOW_NORMAL)  
+    cv.namedWindow(window, cv.WINDOW_NORMAL)
     cv.setMouseCallback(window, click_event)
 
     while True:
@@ -45,6 +45,37 @@ def interpolate_chessboard_corners(points, pattern_size):
     corners = np.array(corners, dtype=np.float32).reshape(-1, 1, 2)
 
     return corners
+
+def interpolate_chessboard_corners_new(points):
+    cols = 6
+    rows = 9
+    
+    # click the points in this conventional order
+    tl, tr, br, bl = points
+
+    corners = []
+
+    # 2. GENERATE POINTS: since the openCV apparently goes from bottom-left up, to end up in top right we will do the same:
+    # we iterate across columns (left to right), starting from the bottom (bottom to top)
+    # Outer Loop: we iterate across Columns (left -> right)
+    for i in range(cols):
+        u = i / (cols - 1) if cols > 1 else 0.0
+        
+        # Calculate the top and bottom points for this specific column 'i'
+        top_point = (1 - u) * tl + u * tr
+        bot_point = (1 - u) * bl + u * br
+        
+        # Inner Loop: iterate up across the row (bottom -> top)
+        for j in range(rows):
+            v = j / (rows - 1) if rows > 1 else 0.0
+            
+            # v=0 is bottom, v=1 is top
+            # We interpolate between bot_point and top_point
+            p = (1 - v) * bot_point + v * top_point
+            
+            corners.append(p)
+
+    return np.array(corners, dtype=np.float32).reshape(-1, 1, 2)
 
 def run_calibration(_objpoints, _imgpoints):
     """
@@ -103,7 +134,7 @@ for fname in images:
         cv.waitKey(500)
     else:
         points4 = get_four_corners_manually(img)
-        corners = interpolate_chessboard_corners(points4, pattern_size=(6,9))
+        corners = interpolate_chessboard_corners_new(points4)
         corners2 = cv.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
         manual_objpoints.append(objp)
         manual_imgpoints.append(corners2)
@@ -112,7 +143,7 @@ for fname in images:
         cv.circle(img, tuple(corners2[0][0].astype(int)), 10, (0, 255, 0), -1) # Green = Start
         cv.circle(img, tuple(corners2[-1][0].astype(int)), 10, (0, 0, 255), -1) # Red = End
         cv.imshow('img', img)
-        cv.waitKey(0)
+        cv.waitKey(1000)
         
 cv.destroyAllWindows()
 

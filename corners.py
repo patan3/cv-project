@@ -184,3 +184,96 @@ run3_img = auto_imgpoints[:5]
 rms3, K3, dist3, rvecs3, tvecs3 = run_calibration(run3_obj, run3_img)
 print(f"Run 3 Reprojection Error: {rms3}")
 print("K Matrix Run 3:\n", K3)
+
+
+
+#### - Online Phase - ####
+
+def draw_axes(img, origin_pt_pixel, axis_pts_pixels):
+    """
+    Draws X (Blue), Y (Green), Z (Red) axes at origin_pt_pixel
+    origin_pt: The 2D pixel where (0,0,0) lands.
+    axis_pts: Array of 3 2D pixels for the tips of X, Y, Z.
+    """
+    origin = tuple(origin_pt_pixel.ravel().astype(int))
+    
+    # OpenCV uses X = Blue, Y = Green, Z = Red
+    # axis_pts[0] = X-tip, axis_pts[1] = Y-tip, axis_pts[2] = Z-tip
+    img = cv.line(img, origin, tuple(axis_pts_pixels[0].ravel().astype(int)), (255,0,0), 5) # Blue = X
+    img = cv.line(img, origin, tuple(axis_pts_pixels[1].ravel().astype(int)), (0,255,0), 5) # Green = Y
+    img = cv.line(img, origin, tuple(axis_pts_pixels[2].ravel().astype(int)), (0,0,255), 5) # Red = Z
+    
+    return img
+
+def draw_cube(img, cubpts):
+    """
+    Draws a cube connecting its 8 points imgpts
+    imgpts: Array of 8 2D pixels representing the cube corners.
+    """
+    cubpts = np.int32(cubpts).reshape(-1, 2)
+
+    # Draw bottom face (first 4 points)
+    img = cv.drawContours(img, [cubpts[:4]], -1, (255, 255, 0), 1)
+
+    # Draw top face (last 4 points)
+    img = cv.drawContours(img, [cubpts[4:]], -1, (255, 255, 0), 1)
+
+    # Draw lines connecting bottom face to top face
+    for i, j in zip(range(4), range(4, 8)):
+        img = cv.line(img, tuple(cubpts[i]), tuple(cubpts[j]), (255, 255, 0), 1)
+
+    return img
+
+axis_length = 3 * square_size
+
+# 3D coordinates for the Axes tips: (3*0.017,0,0), (0,3*0.017,0), (0,0,-3*0.017)
+# (Z = -3*0.017 to point OUT of the board - i.e., towards camera)
+axis_3d = np.float32([
+    [axis_length, 0, 0], 
+    [0, axis_length, 0], 
+    [0, 0, -axis_length]
+]).reshape(-1, 3)
+
+# 3D coordinates for a Cube on origin
+# Bottom face (Z=0): (0,0,0), (0,3*0.017,0), (3*0.017,3*0.017,0), (3*0.017,0,0)
+# Top face (Z=-3*0.017):   (0,0,-3*0.017), (0,3*0.017,-3*0.017), (3*0.017,3*0.017,-3*0.017), (3*0.017,0,-3*0.017)
+cube_3d = np.float32([
+    [0, 0, 0], [0, 3*square_size, 0], [3*square_size, 3*square_size, 0], [3*square_size, 0, 0],  # Bottom face
+    [0, 0, -3*square_size], [0, 3*square_size, -3*square_size], [3*square_size, 3*square_size, -3*square_size], [3*square_size, 0, -3*square_size] # Top face
+])
+
+test_image = 'images\WIN_20260211_15_55_07_Pro.jpg'
+
+def draw_cube_for_run(_win_name, _kmatrix, _dist_coef):
+    img = cv.imread(test_image)
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+
+    ret, corners = cv.findChessboardCorners(gray, (9,6), None)
+
+    if ret == True:
+        corners2 = cv.cornerSubPix(gray, corners, (11,11), (-1, -1), criteria)
+
+        # Calculate Rotation (rvec) and Translation (tvec)
+        # i.e., calculate where the camera is relative to the board
+        _, rvec, tvec = cv.solvePnP(objp, corners2, _kmatrix, _dist_coef)
+
+        # Convert 3D points to 2D pixels
+
+        ## Convert the Axes points
+        axis_2d, _ = cv.projectPoints(axis_3d, rvec, tvec, _kmatrix, _dist_coef)
+        ## Convert the Axis origin
+        origin_2d, _ = cv.projectPoints(np.float32([[0,0,0]]), rvec, tvec, _kmatrix, _dist_coef)
+
+        ## Convert the Cube points
+        cube_2d, _ = cv.projectPoints(cube_3d, rvec, tvec, _kmatrix, _dist_coef)
+        
+        # Draw
+        img = draw_axes(img, origin_2d, axis_2d)
+        img = draw_cube(img, cube_2d)
+        
+        cv.imshow(_win_name, img)
+        cv.waitKey(0)
+
+draw_cube_for_run('Run 1', K1, dist1)    
+draw_cube_for_run('Run 2', K2, dist2)    
+draw_cube_for_run('Run 3', K2, dist2)    
